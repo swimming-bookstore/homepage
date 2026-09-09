@@ -50,12 +50,49 @@
       let targetPitch = 0;
       let yaw = 0;
       let pitch = 0;
+      let dragYaw = 0;
+      let dragPitch = 0;
+      let gyroYaw = 0;
+      let gyroPitch = 0;
+      let pointerX = 0.5;
+      let pointerY = 0.5;
+      let touching = false;
+      let lastTouchX = 0;
+      let lastTouchY = 0;
+      let idleT = 0;
+      let gyroArmed = false;
+
+      function mobileView() {
+        return window.innerWidth < 720 || window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      }
+
+      function clamp(v, a, b) {
+        return Math.max(a, Math.min(b, v));
+      }
+
+      const hero = canvas.parentElement;
+      let lockedW = 0;
+
+      function pinHero() {
+        if (!hero) return;
+        if (mobileView()) {
+          const w = window.innerWidth;
+          if (w !== lockedW) {
+            lockedW = w;
+            hero.style.height = Math.round(window.innerHeight) + "px";
+          }
+        } else {
+          lockedW = 0;
+          hero.style.height = "";
+        }
+      }
 
       function resize() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
+        pinHero();
+        const w = canvas.clientWidth || window.innerWidth;
+        const h = canvas.clientHeight || window.innerHeight;
         renderer.setSize(w, h, false);
-        camera.aspect = w / h;
+        camera.aspect = w / Math.max(h, 1);
         const needW = w < 720 ? 11.6 : 13.4;
         const needH = w < 720 ? 13.8 : 12.6;
         const vFov = camera.fov * Math.PI / 180;
@@ -65,6 +102,10 @@
         camera.updateProjectionMatrix();
       }
       window.addEventListener("resize", resize);
+      window.addEventListener("orientationchange", function () {
+        lockedW = 0;
+        resize();
+      });
       resize();
 
       function paintCut(c, img, cut, showLines) {
@@ -212,34 +253,82 @@
         });
       }
 
-      function aimFrom(x, y) {
-        const w = window.innerWidth || 1;
-        const h = window.innerHeight || 1;
-        const mobile = w < 720;
-        const yawAmt = mobile ? 0.09 : 0.16;
-        const pitchAmt = mobile ? 0.05 : 0.09;
-        targetYaw = ((x / w) * 2 - 1) * yawAmt;
-        targetPitch = ((y / h) * 2 - 1) * pitchAmt;
+      function onOrient(e) {
+        const g = e.gamma || 0;
+        const b = e.beta || 0;
+        gyroYaw = clamp(g / 38, -1, 1) * 0.16;
+        gyroPitch = clamp((b - 48) / 36, -1, 1) * 0.09;
+      }
+
+      function armGyro() {
+        if (gyroArmed) return;
+        gyroArmed = true;
+        const DOE = window.DeviceOrientationEvent;
+        if (!DOE) return;
+        if (typeof DOE.requestPermission === "function") {
+          DOE.requestPermission().then(function (state) {
+            if (state === "granted") window.addEventListener("deviceorientation", onOrient);
+          }).catch(function () {});
+        } else {
+          window.addEventListener("deviceorientation", onOrient);
+        }
       }
 
       window.addEventListener("pointermove", function (e) {
         if (e.pointerType === "touch") return;
-        aimFrom(e.clientX, e.clientY);
+        pointerX = e.clientX / (window.innerWidth || 1);
+        pointerY = e.clientY / (window.innerHeight || 1);
       });
       window.addEventListener("touchstart", function (e) {
         if (!e.touches.length) return;
-        aimFrom(e.touches[0].clientX, e.touches[0].clientY);
+        touching = true;
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+        armGyro();
       }, { passive: true });
       window.addEventListener("touchmove", function (e) {
         if (!e.touches.length) return;
-        aimFrom(e.touches[0].clientX, e.touches[0].clientY);
+        const x = e.touches[0].clientX;
+        const y = e.touches[0].clientY;
+        const dx = x - lastTouchX;
+        const dy = y - lastTouchY;
+        lastTouchX = x;
+        lastTouchY = y;
+        if (Math.abs(dx) < Math.abs(dy) * 0.85) return;
+        const w = window.innerWidth || 1;
+        dragYaw = clamp(dragYaw + (dx / w) * 0.72, -0.32, 0.32);
+        dragPitch = clamp(dragPitch + (dy / (window.innerHeight || 1)) * 0.12, -0.1, 0.1);
       }, { passive: true });
+      window.addEventListener("touchend", function () { touching = false; }, { passive: true });
+      window.addEventListener("touchcancel", function () { touching = false; }, { passive: true });
 
       renderer.setAnimationLoop(function () {
-        yaw += (targetYaw - yaw) * 0.035;
-        pitch += (targetPitch - pitch) * 0.035;
+        const mobile = mobileView();
+        idleT += mobile ? 0.016 : 0.01;
+        const idleYaw = Math.sin(idleT) * (mobile ? 0.042 : 0.012);
+        const idlePitch = Math.cos(idleT * 0.73) * (mobile ? 0.022 : 0.007);
+
+        if (mobile) {
+          if (!touching) {
+            dragYaw += (0 - dragYaw) * 0.045;
+            dragPitch += (0 - dragPitch) * 0.045;
+          }
+          targetYaw = dragYaw + gyroYaw + idleYaw;
+          targetPitch = dragPitch + gyroPitch + idlePitch;
+        } else {
+          targetYaw = (pointerX * 2 - 1) * 0.16 + idleYaw;
+          targetPitch = (pointerY * 2 - 1) * 0.09 + idlePitch;
+        }
+
+        const ease = mobile ? (touching ? 0.14 : 0.07) : 0.035;
+        yaw += (targetYaw - yaw) * ease;
+        pitch += (targetPitch - pitch) * ease;
         shop.rotation.y = yaw;
         shop.rotation.x = pitch;
+        logo.rotation.y = yaw * 0.38;
+        logo.rotation.x = pitch * 0.38;
+        shop.position.x = yaw * (mobile ? 0.55 : 0.2);
+        shop.position.y = -pitch * (mobile ? 0.35 : 0.12);
         renderer.render(scene, camera);
       });
     })();
