@@ -1,0 +1,7 @@
+node_modules/
+_site/
+shop.min.js
+.DS_Store
+*.log
+.idea/
+.vscode/
