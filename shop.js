@@ -6,17 +6,17 @@
       const SRC = typeof __STOREFRONT__ !== "undefined" ? __STOREFRONT__ : "assets/storefront.jpg";
 
       const CUTS = [
-        { name: "1  logo",             x: 555, y:  40, w: 300, h: 300, z: 0.58 },
-        { name: "2  upper banner",     x: 229, y: 360, w: 949, h: 284, z: 0.32 },
-        { name: "3  right banner",     x:1184, y: 664, w: 124, h: 198, z: 0.381 },
-        { name: "4  cornice",          x: 229, y: 644, w: 949, h:  46, z: 0.32 },
-        { name: "5  left window",      x: 236, y: 690, w: 288, h: 348, z: 0.36 },
-        { name: "6  door",             x: 524, y: 690, w: 360, h: 520, z: 0.44 },
-        { name: "7  right window",     x: 884, y: 690, w: 285, h: 348, z: 0.36 },
-        { name: "8  wall under left",  x: 236, y:1038, w: 288, h: 172, z: 0.28 },
-        { name: "9  wall under right", x: 884, y:1038, w: 285, h: 172, z: 0.28 },
-        { name: "10 post",             x:1166, y: 708, w:  26, h: 154, z: 0.38 },
-        { name: "11 steps",            x: 214, y:1210, w: 977, h: 105, z: 0.22 }
+        { name: "logo",             x: 555, y:  40, w: 300, h: 300, z: 0.58 },
+        { name: "upper banner",     x: 229, y: 360, w: 949, h: 284, z: 0.32 },
+        { name: "right banner",     x:1184, y: 664, w: 124, h: 198, z: 0.381 },
+        { name: "cornice",          x: 229, y: 644, w: 949, h:  46, z: 0.32 },
+        { name: "left window",      x: 236, y: 690, w: 288, h: 348, z: 0.36 },
+        { name: "door",             x: 524, y: 690, w: 360, h: 520, z: 0.44 },
+        { name: "right window",     x: 884, y: 690, w: 285, h: 348, z: 0.36 },
+        { name: "wall under left",  x: 236, y:1038, w: 288, h: 172, z: 0.28 },
+        { name: "wall under right", x: 884, y:1038, w: 285, h: 172, z: 0.28 },
+        { name: "post",             x:1166, y: 708, w:  26, h: 154, z: 0.38 },
+        { name: "steps",            x: 214, y:1210, w: 977, h: 105, z: 0.22 }
       ];
 
       const params = new URLSearchParams(location.search);
@@ -50,15 +50,11 @@
       let targetPitch = 0;
       let yaw = 0;
       let pitch = 0;
-      let dragYaw = 0;
-      let dragPitch = 0;
       let gyroYaw = 0;
       let gyroPitch = 0;
       let pointerX = 0.5;
       let pointerY = 0.5;
       let touching = false;
-      let lastTouchX = 0;
-      let lastTouchY = 0;
       let idleT = 0;
       let gyroArmed = false;
 
@@ -72,19 +68,32 @@
 
       const hero = canvas.parentElement;
       let lockedW = 0;
+      let lockedDebug = null;
 
       function pinHero() {
         if (!hero) return;
-        if (mobileView()) {
-          const w = window.innerWidth;
-          if (w !== lockedW) {
-            lockedW = w;
-            hero.style.height = Math.round(window.innerHeight) + "px";
+        const debugOn = !!(panel && !panel.classList.contains("hidden"));
+        const w = window.innerWidth;
+        if (!debugOn) {
+          if (!mobileView()) {
+            lockedW = 0;
+            lockedDebug = null;
+            hero.style.height = "";
+            return;
           }
-        } else {
-          lockedW = 0;
-          hero.style.height = "";
+          if (w === lockedW && lockedDebug === false) return;
+          lockedW = w;
+          lockedDebug = false;
+          const viewH = Math.round((window.visualViewport && window.visualViewport.height) || window.innerHeight);
+          hero.style.height = Math.max(280, viewH) + "px";
+          return;
         }
+        if (w === lockedW && lockedDebug === true) return;
+        lockedW = w;
+        lockedDebug = true;
+        const above = hero.offsetTop || 0;
+        const viewH = Math.round((window.visualViewport && window.visualViewport.height) || window.innerHeight);
+        hero.style.height = Math.max(280, viewH - above) + "px";
       }
 
       function resize() {
@@ -129,7 +138,7 @@
           g.fillStyle = "#e23b3b";
           g.font = "700 18px Outfit, system-ui, sans-serif";
           g.textBaseline = "top";
-          g.fillText(cut.name, 8, 8);
+          g.fillText((CUTS.indexOf(cut) + 1) + "  " + cut.name, 8, 8);
           g.restore();
         }
       }
@@ -156,14 +165,17 @@
       function renderPanel() {
         if (!panel) return;
         panel.classList.toggle("hidden", !debug);
+        document.body.classList.toggle("debug-on", debug);
         if (!debug) return;
         panel.innerHTML =
-          "<h2>Debug · cuts</h2><ol>" +
+          "<h2>debug</h2><ul>" +
           pieces.map(function (p, i) {
             const off = p.mesh.visible ? "" : " class='off'";
-            return "<li data-i='" + i + "'" + off + ">" + p.cut.name + "</li>";
+            return "<li data-i='" + i + "'" + off + ">" + (i + 1) + "  " + p.cut.name + "</li>";
           }).join("") +
-          "</ol><p class='hint'>Click a piece or a name to hide/show</p>";
+          "</ul><p class='hint'>Click a piece or a name to hide/show</p>";
+        pinHero();
+        resize();
       }
 
       function setDebug(on) {
@@ -210,7 +222,7 @@
           mesh.material.polygonOffsetUnits = -mesh.renderOrder;
           const line = redBox(cut);
           mesh.add(line);
-          if (/^1\s/.test(cut.name)) logo.add(mesh);
+          if (cut.name === "logo") logo.add(mesh);
           else shop.add(mesh);
           pieces.push({ mesh: mesh, canvas: c, map: map, img: img, cut: cut, line: line });
         });
@@ -229,8 +241,11 @@
       window.addEventListener("pointerup", function (e) {
         if (!debug) return;
         if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) return;
-        pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-        pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        const r = canvas.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+        pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+        pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
         raycaster.setFromCamera(pointer, camera);
         const hits = raycaster.intersectObjects(pieces.map(function (p) { return p.mesh; }), false);
         if (!hits.length) return;
@@ -274,33 +289,31 @@
         }
       }
 
+      function aimFrom(x, y) {
+        const r = canvas.getBoundingClientRect();
+        const w = r.width || window.innerWidth || 1;
+        const h = r.height || window.innerHeight || 1;
+        pointerX = clamp((x - r.left) / w, 0, 1);
+        pointerY = clamp((y - r.top) / h, 0, 1);
+      }
+
       window.addEventListener("pointermove", function (e) {
         if (e.pointerType === "touch") return;
-        pointerX = e.clientX / (window.innerWidth || 1);
-        pointerY = e.clientY / (window.innerHeight || 1);
+        aimFrom(e.clientX, e.clientY);
       });
-      window.addEventListener("touchstart", function (e) {
-        if (!e.touches.length) return;
+      canvas.addEventListener("pointerdown", function (e) {
+        if (e.pointerType !== "touch" && !mobileView()) return;
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
         touching = true;
-        lastTouchX = e.touches[0].clientX;
-        lastTouchY = e.touches[0].clientY;
+        aimFrom(e.clientX, e.clientY);
         armGyro();
-      }, { passive: true });
-      window.addEventListener("touchmove", function (e) {
-        if (!e.touches.length) return;
-        const x = e.touches[0].clientX;
-        const y = e.touches[0].clientY;
-        const dx = x - lastTouchX;
-        const dy = y - lastTouchY;
-        lastTouchX = x;
-        lastTouchY = y;
-        if (Math.abs(dx) < Math.abs(dy) * 0.85) return;
-        const w = window.innerWidth || 1;
-        dragYaw = clamp(dragYaw + (dx / w) * 0.72, -0.32, 0.32);
-        dragPitch = clamp(dragPitch + (dy / (window.innerHeight || 1)) * 0.12, -0.1, 0.1);
-      }, { passive: true });
-      window.addEventListener("touchend", function () { touching = false; }, { passive: true });
-      window.addEventListener("touchcancel", function () { touching = false; }, { passive: true });
+      });
+      canvas.addEventListener("pointermove", function (e) {
+        if (!touching) return;
+        aimFrom(e.clientX, e.clientY);
+      });
+      canvas.addEventListener("pointerup", function () { touching = false; });
+      canvas.addEventListener("pointercancel", function () { touching = false; });
 
       renderer.setAnimationLoop(function () {
         const mobile = mobileView();
@@ -308,19 +321,18 @@
         const idleYaw = Math.sin(idleT) * (mobile ? 0.042 : 0.012);
         const idlePitch = Math.cos(idleT * 0.73) * (mobile ? 0.022 : 0.007);
 
-        if (mobile) {
-          if (!touching) {
-            dragYaw += (0 - dragYaw) * 0.045;
-            dragPitch += (0 - dragPitch) * 0.045;
-          }
-          targetYaw = dragYaw + gyroYaw + idleYaw;
-          targetPitch = dragPitch + gyroPitch + idlePitch;
+        if (mobile && touching) {
+          targetYaw = (pointerX * 2 - 1) * 0.24;
+          targetPitch = (pointerY * 2 - 1) * 0.2;
+        } else if (mobile) {
+          targetYaw = gyroYaw + idleYaw;
+          targetPitch = gyroPitch + idlePitch;
         } else {
           targetYaw = (pointerX * 2 - 1) * 0.16 + idleYaw;
           targetPitch = (pointerY * 2 - 1) * 0.09 + idlePitch;
         }
 
-        const ease = mobile ? (touching ? 0.14 : 0.07) : 0.035;
+        const ease = mobile ? (touching ? 0.18 : 0.07) : 0.035;
         yaw += (targetYaw - yaw) * ease;
         pitch += (targetPitch - pitch) * ease;
         shop.rotation.y = yaw;

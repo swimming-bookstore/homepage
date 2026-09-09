@@ -18,11 +18,15 @@
     }
     canvas {
       position: absolute; inset: 0; width: 100%; height: 100%;
-      display: block; touch-action: pan-y;
+      display: block; touch-action: none;
     }
     header {
       position: fixed; top: 0; left: 0; z-index: 2;
       padding: 28px 40px; pointer-events: none;
+    }
+    body.debug-on header {
+      position: relative;
+      padding: 16px 18px 8px;
     }
     .brand {
       font-family: "Noto Serif KR", "Cormorant Garamond", serif;
@@ -38,17 +42,19 @@
 
 
     #debug {
-      position: fixed; top: 72px; right: 16px; z-index: 3;
+      position: static;
+      z-index: 1;
       background: rgba(29, 53, 80, 0.88); color: #fff9ef;
       font-size: 11px; line-height: 1.45; letter-spacing: 0.02em;
-      padding: 12px 14px; border-radius: 10px; max-width: 280px;
+      padding: 8px 12px; margin: 0; border-radius: 0;
       pointer-events: auto;
     }
+
     #debug h2 {
       font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
       opacity: 0.7; margin-bottom: 8px; font-weight: 500;
     }
-    #debug ol { padding-left: 18px; }
+    #debug ul { list-style: none; }
     #debug li { cursor: pointer; }
     #debug li.off { opacity: 0.35; text-decoration: line-through; }
     #debug .hint { margin-top: 8px; opacity: 0.6; font-size: 10px; }
@@ -74,7 +80,7 @@
       color: var(--mute);
     }
     @media (max-width: 720px) {
-      header { padding: 16px 18px; }
+      header { padding: 16px 18px 8px; }
       .brand { font-size: 13px; letter-spacing: 0.04em; }
       .brand em { display: block; margin: 4px 0 0; font-size: 11px; letter-spacing: 0.14em; }
       footer { padding: 20px 18px 28px; font-size: 11px; }
@@ -85,10 +91,10 @@
   <header>
     <span class="brand">수영 책방 <em>Swimming Bookstore</em></span>
   </header>
+  <aside id="debug" class="hidden"></aside>
   <section class="hero">
     <canvas id="scene"></canvas>
   </section>
-  <aside id="debug" class="hidden"></aside>
   <section class="motto" id="motto">
     <p>play don't work</p>
   </section>
